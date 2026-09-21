@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & GODMODE V1.2 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & GODMODE V1.3 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -212,30 +212,27 @@ task.spawn(function()
 
         -- 3. АВТО-ФАРМ МОНЕТ (ПОИСК Coin_Server ВО ВСЕМ ВОРКСПЕЙСЕ)
         if autoFarmActive then
-            if collectedCoinsCount >= maxCoinsPerRound then
-                root.CFrame = safePointCFrame
-            else
-                local coins = {}
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
-                        if obj.Transparency < 1 then
-                            table.insert(coins, obj)
-                        end
+            local coins = {}
+            for _, obj in ipairs(Workspace:GetDescendants()) do
+                if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
+                    -- Добавим проверку: даже если прозрачность 1, но паретт существует — берем
+                    if obj.Parent then
+                        table.insert(coins, obj)
                     end
                 end
+            end
 
-                if #coins > 0 then
-                    for _, coinPart in ipairs(coins) do
-                        if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
-                        if coinPart and coinPart.Parent and coinPart.Transparency < 1 then
-                            root.CFrame = coinPart.CFrame
-                            collectedCoinsCount = collectedCoinsCount + 1
-                            task.wait(0.25)
-                        end
+            if #coins > 0 then
+                for _, coinPart in ipairs(coins) do
+                    if not autoFarmActive then break end
+                    if coinPart and coinPart.Parent then
+                        root.CFrame = coinPart.CFrame
+                        task.wait(0.2) -- Небольшая задержка, чтобы не кикало за телепорт
                     end
-                else
-                    root.CFrame = safePointCFrame
                 end
+            else
+                -- Если монет вообще нет, просто стоим на месте (не дергаем в сейф-точку каждую секунду)
+                -- root.CFrame = safePointCFrame -- Можешь закомментировать эту строку, чтобы персонаж не улетал
             end
         end
 
