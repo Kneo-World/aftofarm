@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.8 (INFINITE AFK)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V1.9 (ULTIMATE AFK & RESPAWN)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -26,7 +26,7 @@ local safePointCFrame = CFrame.new(0, 100, 0)
 -- ========== Вспомогательные функции ==========
 local function getCharacter()
     local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
         return char, char.Humanoid, char.HumanoidRootPart
     end
     return nil, nil, nil
@@ -104,6 +104,12 @@ local function smoothFlyTo(targetCFrame)
             tween:Cancel()
             break
         end
+        -- Если умерли прямо во время полета — прерываем твин
+        local _, _, currentRoot = getCharacter()
+        if not currentRoot then
+            tween:Cancel()
+            break
+        end
         elapsed = elapsed + 0.05
         task.wait(0.05)
     end
@@ -111,7 +117,7 @@ end
 
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm (AFK Mode)",
+   Name = "💰 MM2 PRO Auto-Farm (Ultimate AFK)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -185,78 +191,93 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: БЕСКОНЕЧНЫЙ АВТО-ФАРМ (ВЕЧНЫЙ ЦИКЛ) ====================
+-- ==================== ПОТОК 1: БЕСКОНЕЧНЫЙ АВТО-ФАРМ С АВТО-РЕЖИМОМ ПОСЛЕ СМЕРТИ ====================
 task.spawn(function()
     while true do
         task.wait(0.5)
         if autoFarmActive then
             local char, hum, root = getCharacter()
-            if char and root then
-                -- Если собрали 40 монет за раунд, уходим в сейф и ждем начала нового раунда
-                if collectedCoinsCount >= maxCoinsPerRound then
-                    root.CFrame = safePointCFrame
+            
+            -- Если персонаж умер или еще не загрузился, ждем возрождения и не ломаем цикл
+            if not char or not root or not hum then
+                task.wait(1)
+                continue
+            end
+
+            -- Если собрали 40 монет за раунд, уходим в сейф и ждем нового раунда
+            if collectedCoinsCount >= maxCoinsPerRound then
+                root.CFrame = safePointCFrame
+                
+                local newRoundStarted = false
+                while not newRoundStarted do
+                    if not autoFarmActive then break end
                     
-                    -- Ждем пока на карте снова появятся монеты (начало нового раунда)
-                    local newRoundStarted = false
-                    while not newRoundStarted do
-                        if not autoFarmActive then break end
-                        task.wait(2)
-                        
-                        local checkCoinsCount = 0
-                        for _, obj in ipairs(Workspace:GetDescendants()) do
-                            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
-                                if obj.Parent then
-                                    checkCoinsCount = checkCoinsCount + 1
-                                end
-                            end
-                        end
-                        
-                        -- Как только монеты появились снова — сбрасываем счетчик и летим дальше фармить
-                        if checkCoinsCount > 5 then
-                            collectedCoinsCount = 0
-                            newRoundStarted = true
-                        end
-                    end
-                else
-                    -- Ищем ближайшую монету по всему Workspace
-                    local nearestCoin = nil
-                    local shortestDistance = math.huge
+                    -- Проверяем жив ли еще персонаж во время ожидания
+                    local _, _, checkRoot = getCharacter()
+                    if not checkRoot then break end
                     
+                    task.wait(2)
+                    
+                    local checkCoinsCount = 0
                     for _, obj in ipairs(Workspace:GetDescendants()) do
                         if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
                             if obj.Parent then
-                                local dist = (root.Position - obj.Position).Magnitude
-                                if dist < shortestDistance then
-                                    shortestDistance = dist
-                                    nearestCoin = obj
-                                end
+                                checkCoinsCount = checkCoinsCount + 1
                             end
                         end
                     end
+                    
+                    if checkCoinsCount > 5 then
+                        collectedCoinsCount = 0
+                        newRoundStarted = true
+                    end
+                end
+            else
+                -- Ищем ближайшую монету по всему Workspace
+                local nearestCoin = nil
+                local shortestDistance = math.huge
+                
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
+                        if obj.Parent then
+                            local dist = (root.Position - obj.Position).Magnitude
+                            if dist < shortestDistance then
+                                shortestDistance = dist
+                                nearestCoin = obj
+                            end
+                        end
+                    end
+                end
 
-                    if nearestCoin and nearestCoin.Parent then
-                        -- Летим к ближайшей монете со скоростью 30
-                        smoothFlyTo(nearestCoin.CFrame)
+                if nearestCoin and nearestCoin.Parent then
+                    -- Летим к ближайшей монете со скоростью 30
+                    smoothFlyTo(nearestCoin.CFrame)
+                    
+                    -- Проверяем, живы ли после полета
+                    local _, _, aliveRoot = getCharacter()
+                    if aliveRoot then
                         collectedCoinsCount = collectedCoinsCount + 1
                         
-                        -- Пауза 2.5 секунды для безопасности от античита (Error 267)
+                        -- Пауза 2.5 секунды для безопасности от античита
                         local waitElapsed = 0
                         while waitElapsed < 2.5 do
                             if not autoFarmActive then break end
+                            local _, _, rCheck = getCharacter()
+                            if not rCheck then break end -- прерываем паузу если умерли
                             waitElapsed = waitElapsed + 0.1
                             task.wait(0.1)
                         end
-                    else
-                        -- Если монет нет, ждем немного перед повторным сканированием
-                        task.wait(1)
                     end
+                else
+                    -- Если монет нет, ждем появления
+                    task.wait(1)
                 end
             end
         end
     end
 end)
 
--- ==================== ПОТОК 2: БОЕВАЯ СИСТЕМА (ШЕРИФ, ПИСТОЛЕТ, УБИЙЦА) ====================
+-- ==================== ПОТОК 2: БОЕВАЯ СИСТЕМА ====================
 task.spawn(function()
     while true do
         task.wait(0.3)
@@ -264,7 +285,6 @@ task.spawn(function()
         local char, hum, root = getCharacter()
         if not char or not root or not hum then continue end
 
-        -- 1. Проверяем шерифа / пистолет / сейф (только если включено)
         if sheriffFlingActive then
             local sheriff = getSheriffPlayer()
             if sheriff and sheriff ~= LocalPlayer and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
@@ -273,12 +293,19 @@ task.spawn(function()
                 local startTime = tick()
                 
                 while sheriff and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") and (tick() - startTime < 1.2) do
+                    local _, _, currentRoot = getCharacter()
+                    if not currentRoot then break end
+                    
                     root.CFrame = sheriffRoot.CFrame
                     root.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
                     sheriffRoot.AssemblyLinearVelocity = Vector3.new(0, -5000, 0)
                     task.wait(0.05)
                 end
-                root.CFrame = oldPos
+                
+                local _, _, finalRoot = getCharacter()
+                if finalRoot then
+                    root.CFrame = oldPos
+                end
             else
                 local gunDrop = Workspace:FindFirstChild("GunDrop", true) or Workspace:FindFirstChild("Gun", true)
                 if gunDrop and gunDrop:IsA("BasePart") then
@@ -296,7 +323,6 @@ task.spawn(function()
             end
         end
 
-        -- 2. Авто-убийство убийцы с фиксацией позиции
         if autoShootMurderer then
             local gun = char:FindFirstChild("Gun") or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Gun"))
             if gun then
@@ -311,6 +337,9 @@ task.spawn(function()
                         
                         for i = 1, 5 do
                             pcall(function()
+                                local _, _, currentRoot = getCharacter()
+                                if not currentRoot then return end
+                                
                                 root.CFrame = mRoot.CFrame * CFrame.new(0, 0, 1.5)
                                 local shootEvent = gun:FindFirstChild("Shoot", true) or ReplicatedStorage:FindFirstChild("Shoot", true)
                                 if shootEvent then
@@ -329,4 +358,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Бесконечный AFK Фарм запущен!", Content = "Теперь скрипт будет фармить монеты раунд за раундом автоматически.", Duration = 4})
+Rayfield:Notify({Title = "MM2 AFK Фарм защищен от смерти!", Content = "Теперь скрипт не ломается при гибели персонажа.", Duration = 4})
