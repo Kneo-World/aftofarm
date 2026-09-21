@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V2.3 (PARTS COIN FIX)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.4 (COIN CONTAINER FIX)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -79,22 +79,21 @@ local function getSheriffPlayer()
     return nil
 end
 
--- Точный поиск монет-партов
+-- Точный поиск именно Coin_Server внутри CoinContainer
 local function findNearestCoin(rootPos)
+    local coinContainer = Workspace:FindFirstChild("CoinContainer")
+    if not coinContainer then return nil end
+
     local nearestCoin = nil
     local shortestDistance = math.huge
 
-    for _, obj in ipairs(Workspace:GetDescendants()) do
-        -- Монеты в MM2 — это BasePart (Part / MeshPart)
-        if obj:IsA("BasePart") then
-            local name = string.lower(obj.Name)
-            if name == "coin_server" or name == "coin" or string.find(name, "coin") then
-                if obj.Parent then
-                    local dist = (rootPos - obj.Position).Magnitude
-                    if dist < shortestDistance then
-                        shortestDistance = dist
-                        nearestCoin = obj
-                    end
+    for _, obj in ipairs(coinContainer:GetChildren()) do
+        if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
+            if obj.Parent then
+                local dist = (rootPos - obj.Position).Magnitude
+                if dist < shortestDistance then
+                    shortestDistance = dist
+                    nearestCoin = obj
                 end
             end
         end
@@ -104,7 +103,7 @@ end
 
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm (Parts Fix)",
+   Name = "💰 MM2 PRO Auto-Farm (CoinContainer)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -118,7 +117,7 @@ local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмер
 FarmTab:CreateSection("Управление Авто-Фармом")
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Авто-Фарм (Парты)",
+   Name = "💰 Включить Авто-Фарм (CoinContainer)",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -180,7 +179,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: НАДЕЖНЫЙ СБОР ПАРТ-МОНЕТ ====================
+-- ==================== ПОТОК 1: СБОР ИЗ COINCONTAINER ====================
 task.spawn(function()
     while true do
         task.wait(0.2)
@@ -194,11 +193,14 @@ task.spawn(function()
             continue
         end
 
-        -- Считаем монеты для сброса лимита нового раунда
+        -- Считаем монеты внутри контейнера для сброса лимита раунда[cite: 7]
         local totalCoinsOnMap = 0
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "coin") then
-                if obj.Parent then totalCoinsOnMap = totalCoinsOnMap + 1 end
+        local coinContainer = Workspace:FindFirstChild("CoinContainer")
+        if coinContainer then
+            for _, obj in ipairs(coinContainer:GetChildren()) do
+                if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
+                    totalCoinsOnMap = totalCoinsOnMap + 1
+                end
             end
         end
 
@@ -206,14 +208,14 @@ task.spawn(function()
             collectedCoinsCount = 0
         end
 
-        -- Если собрали лимит — в сейф
+        -- Если собрали лимит — летим в сейф
         if collectedCoinsCount >= maxCoinsPerRound then
             root.CFrame = safePointCFrame
             task.wait(1)
             continue
         end
 
-        -- Ищем ближайшую монету-парт
+        -- Ищем ближайшую монету в контейнере[cite: 7]
         local nearestCoin = findNearestCoin(root.Position)
 
         if nearestCoin and nearestCoin.Parent then
@@ -329,4 +331,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт обновлен (V2.3)", Content = "Сбор партов-монет активирован!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт обновлен (V2.4)", Content = "Поиск по CoinContainer настроен!", Duration = 4})
