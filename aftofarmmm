@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V2.0 (INSTANT CHECK)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.1 (FIXED FLY & HOVER)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -8,7 +8,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 
 -- ========== Переменные состояния ==========
@@ -19,7 +18,6 @@ local maxCoinsPerRound = 40
 local godModeActive = true
 local autoShootMurderer = true
 local sheriffFlingActive = true
-local autoGrabGun = true
 
 local safePointCFrame = CFrame.new(0, 100, 0)
 
@@ -81,43 +79,9 @@ local function getSheriffPlayer()
     return nil
 end
 
--- Плавный полет со скоростью 30 (безопасно от киков)
-local function smoothFlyTo(targetCFrame)
-    local char, hum, root = getCharacter()
-    if not root then return end
-    
-    local distance = (root.Position - targetCFrame.Position).Magnitude
-    local timeVal = distance / 30
-    
-    if timeVal < 0.05 then
-        root.CFrame = targetCFrame
-        return
-    end
-
-    local tweenInfo = TweenInfo.new(timeVal, Enum.EasingStyle.Linear)
-    local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
-    tween:Play()
-    
-    local elapsed = 0
-    while elapsed < timeVal do
-        -- Если автофарм выключили на лету — сразу отменяем полет
-        if not autoFarmActive then
-            tween:Cancel()
-            break
-        end
-        local _, _, currentRoot = getCharacter()
-        if not currentRoot then
-            tween:Cancel()
-            break
-        end
-        elapsed = elapsed + 0.05
-        task.wait(0.05)
-    end
-end
-
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm (Instant Check)",
+   Name = "💰 MM2 PRO Auto-Farm (Fixed Fly)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -131,7 +95,7 @@ local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмер
 FarmTab:CreateSection("Управление Авто-Фармом")
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Авто-Фарм (Мгновенный старт)",
+   Name = "💰 Включить Авто-Фарм (Без зависаний)",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -193,22 +157,21 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: ПОСТОЯННАЯ ПРОВЕРКА И ФАРМ ====================
+-- ==================== ПОТОК 1: УМНЫЙ АВТО-ФАРМ БЕЗ ЗАВИСАНИЙ ====================
 task.spawn(function()
     while true do
-        task.wait(0.2) -- Проверяем состояние каждые 0.2 секунды
+        task.wait(0.2)
         
-        -- Главное условие: если фарм выключен тумблером, просто пропускаем цикл
         if not autoFarmActive then
             continue
         end
 
         local char, hum, root = getCharacter()
         if not char or not root or not hum then
-            continue -- Если персонаж умер или грузится, ждем следующий тик
+            continue
         end
 
-        -- Сбрасываем счетчик если начался новый раунд (монет снова много на карте)
+        -- Проверка нового раунда по количеству монет
         local totalCoinsOnMap = 0
         for _, obj in ipairs(Workspace:GetDescendants()) do
             if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
@@ -222,7 +185,7 @@ task.spawn(function()
             collectedCoinsCount = 0
         end
 
-        -- Если собрали лимит за раунд, уходим в сейф
+        -- Если лимит собран — летим в сейф
         if collectedCoinsCount >= maxCoinsPerRound then
             root.CFrame = safePointCFrame
             task.wait(1)
@@ -246,28 +209,35 @@ task.spawn(function()
         end
 
         if nearestCoin and nearestCoin.Parent then
-            -- Летим к монете
-            smoothFlyTo(nearestCoin.CFrame)
-            
-            -- Проверяем, не выключили ли фарм во время полета
-            if not autoFarmActive then continue end
+            -- Плавное и безопасное перемещение к монете без зависаний
+            local targetPos = nearestCoin.Position
+            while autoFarmActive and nearestCoin and nearestCoin.Parent do
+                local _, _, currentHum, currentRoot = getCharacter()
+                if not currentRoot then break end
+                
+                local currentPos = currentRoot.Position
+                local distance = (currentPos - targetPos).Magnitude
+                
+                if distance < 3 then
+                    root.CFrame = nearestCoin.CFrame
+                    break
+                end
+                
+                -- Двигаем персонажа плавно каждый кадр со скоростью 35
+                local moveDir = (targetPos - currentPos).Unit
+                currentRoot.CFrame = CFrame.new(currentPos + moveDir * math.min(distance, 35 * 0.05), targetPos)
+                currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                
+                task.wait(0.05)
+            end
             
             local _, _, aliveRoot = getCharacter()
-            if aliveRoot then
+            if aliveRoot and autoFarmActive then
                 collectedCoinsCount = collectedCoinsCount + 1
-                
-                -- Небольшая легитимная пауза перед следующей монетой, но с постоянной проверкой тумблера
-                local waitTime = 0
-                while waitTime < 2.0 do
-                    if not autoFarmActive then break end
-                    local _, _, rCheck = getCharacter()
-                    if not rCheck then break end
-                    waitTime = waitTime + 0.2
-                    task.wait(0.2)
-                end
+                task.wait(0.3) -- Небольшая пауза между монетами для стабильности
             end
         else
-            -- Если монет нет на карте вообще, ждем секунду и проверяем снова
+            -- Если монет нет вообще, ждем секунду
             task.wait(1)
         end
     end
@@ -354,4 +324,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Скрипт обновлен (V2.0)", Content = "Мгновенная проверка статуса тумблера активирована.", Duration = 4})
+Rayfield:Notify({Title = "Скрипт обновлен (V2.1)", Content = "Ошибка зависания в воздухе исправлена!", Duration = 4})
