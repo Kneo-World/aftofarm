@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V2.2 (UNIVERSAL COIN FINDER)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.2 (UNIVERSAL COIN FINDER)67
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
