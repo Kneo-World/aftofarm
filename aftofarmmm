@@ -1,0 +1,290 @@
+-- ============================================================
+-- MM2 ULTIMATE AUTO-FARM & GODMODE V1.0 (BY KNEO WORLD)
+-- ============================================================
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- ========== Переменные состояния ==========
+local autoFarmActive = false
+local collectedCoinsCount = 0
+local maxCoinsPerRound = 40
+
+local godModeActive = true
+local autoShootMurderer = true
+local sheriffFlingActive = true
+local autoGrabGun = true
+
+local safePointCFrame = CFrame.new(0, 100, 0)
+local originalPosition = nil
+
+-- ========== Вспомогательные функции ==========
+local function getCharacter()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") then
+        return char, char.Humanoid, char.HumanoidRootPart
+    end
+    return nil, nil, nil
+end
+
+local function getRoles()
+    local getPlayerData = ReplicatedStorage:FindFirstChild("GetPlayerData", true)
+    if not getPlayerData then return {} end
+    local success, data = pcall(function() return getPlayerData:InvokeServer() end)
+    if not success or typeof(data) ~= "table" then return {} end
+    
+    local roles = {}
+    for plrName, plrData in pairs(data) do
+        if not plrData.Dead then
+            roles[plrName] = plrData.Role
+        end
+    end
+    return roles
+end
+
+local function getMurdererPlayer()
+    local roles = getRoles()
+    for plrName, role in pairs(roles) do
+        if role == "Murderer" then
+            return Players:FindFirstChild(plrName)
+        end
+    end
+    -- Запасной поиск по предмету Knife
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            if plr.Character:FindFirstChild("Knife") or (plr:FindFirstChild("Backpack") and plr.Backpack:FindFirstChild("Knife")) then
+                return plr
+            end
+        end
+    end
+    return nil
+end
+
+local function getSheriffPlayer()
+    local roles = getRoles()
+    for plrName, role in pairs(roles) do
+        if role == "Sheriff" or role == "Hero" then
+            return Players:FindFirstChild(plrName)
+        end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character then
+            if plr.Character:FindFirstChild("Gun") or (plr:FindFirstChild("Backpack") and plr.Backpack:FindFirstChild("Gun")) then
+                return plr
+            end
+        end
+    end
+    return nil
+end
+
+-- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
+local Window = Rayfield:CreateWindow({
+   Name = "💰 MM2 PRO Auto-Farm & God Mode",
+   LoadingTitle = "Загрузка системы...",
+   LoadingSubtitle = "by Kneo World",
+   ConfigurationSaving = { Enabled = false },
+   KeySystem = false
+})
+
+local FarmTab = Window:CreateTab("🚀 Авто-Фарм & Убийца", 4483362458)
+local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмертие", 4483362458)
+
+-- ==================== ВКЛАДКА ФАРМА ====================
+FarmTab:CreateSection("Управление Авто-Фармом (Цель: 40 монет)")
+
+FarmTab:CreateToggle({
+   Name = "💰 Включить Умный Авто-Фарм",
+   CurrentValue = false,
+   Callback = function(Value)
+      autoFarmActive = Value
+      collectedCoinsCount = 0
+      local _, _, root = getCharacter()
+      if Value and root then
+          originalPosition = root.CFrame
+      end
+   end,
+})
+
+FarmTab:CreateButton({
+   Name = "📌 Установить Safe-Точку (Куда прятаться)",
+   Callback = function()
+      local _, _, root = getCharacter()
+      if root then
+          safePointCFrame = root.CFrame
+          Rayfield:Notify({Title = "Успешно", Content = "Безопасная точка сохранена!", Duration = 2})
+      end
+   end,
+})
+
+FarmTab:CreateToggle({
+   Name = "🎯 Авто-Убийство Убийцы (Сквозь стены + 5 выстрелов)",
+   CurrentValue = true,
+   Callback = function(Value) autoShootMurderer = Value end,
+})
+
+FarmTab:CreateToggle({
+   Name = "💨 Рванка Шерифа (Выбросить за карту)",
+   CurrentValue = true,
+   Callback = function(Value) sheriffFlingActive = Value end,
+})
+
+FarmTab:CreateToggle({
+   Name = "🔫 Авто-подбор пистолета при падении",
+   CurrentValue = true,
+   Callback = function(Value) autoGrabGun = Value end,
+})
+
+-- ==================== ВКЛАДКА НАСТРОЕК ====================
+SettingsTab:CreateSection("Бессмертие и Защита")
+
+SettingsTab:CreateToggle({
+   Name = "🛡️ God Mode (Неуязвимость)",
+   CurrentValue = true,
+   Callback = function(Value) godModeActive = Value end,
+})
+
+-- ==================== ЛОГИКА БЕССМЕРТИЯ (GOD MODE) ====================
+RunService.Stepped:Connect(function()
+    if not godModeActive then return end
+    local char, hum, _ = getCharacter()
+    if char and hum then
+        -- Отключаем состояния урона и падения
+        hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+        
+        -- Убираем коллизию с другими игроками, чтобы не давать себя задеть
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character then
+                for _, part in ipairs(plr.Character:GetChildren()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ==================== ГЛАВНЫЙ ЦИКЛ АВТО-ФАРМА И БОЯ ====================
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        
+        local char, hum, root = getCharacter()
+        if not char or not root or not hum then continue end
+
+        -- 1. ЛОГИКА РВАНКИ ШЕРИФА (если включено и есть шериф)
+        if sheriffFlingActive then
+            local sheriff = getSheriffPlayer()
+            if sheriff and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
+                local sheriffRoot = sheriff.Character.HumanoidRootPart
+                -- Проверяем, что шериф не мы сами
+                if sheriff ~= LocalPlayer then
+                    -- Быстро рваним шерифа за карту (телепорт под карту / далеко вверх)
+                    local oldPos = root.CFrame
+                    local startTime = tick()
+                    
+                    -- Выполняем короткую рванку шерифа
+                    while sheriff and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") and (tick() - startTime < 1.5) do
+                        root.CFrame = sheriffRoot.CFrame
+                        root.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
+                        sheriffRoot.AssemblyLinearVelocity = Vector3.new(0, -5000, 0)
+                        task.wait(0.05)
+                    end
+                    root.CFrame = oldPos
+                end
+            end
+        end
+
+        -- 2. АВТО-ПОДБОР ПИСТОЛЕТА С ЗЕМЛИ
+        if autoGrabGun then
+            local gunDrop = Workspace:FindFirstChild("GunDrop", true) or Workspace:FindFirstChild("Gun", true)
+            if gunDrop and gunDrop:IsA("BasePart") then
+                if firetouchinterest then
+                    firetouchinterest(root, gunDrop, 0)
+                    task.wait(0.05)
+                    firetouchinterest(root, gunDrop, 1)
+                else
+                    root.CFrame = gunDrop.CFrame
+                end
+            end
+        end
+
+        -- 3. ЛОГИКА АВТОФАРМА МОНЕТ (ДО 40 ШТУК)
+        if autoFarmActive then
+            if collectedCoinsCount >= maxCoinsPerRound then
+                -- Достигли лимита в 40 монет — уходим на безопасную точку
+                root.CFrame = safePointCFrame
+            else
+                local coinContainer = Workspace:FindFirstChild("Normal") or Workspace:FindFirstChild("CoinContainer", true)
+                if coinContainer then
+                    local collectedInThisTick = false
+                    for _, child in ipairs(coinContainer:GetDescendants()) do
+                        if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
+                        
+                        if child.Name == "Coin" or child.Name == "CoinContainer" or child:IsA("TouchTransmitter") then
+                            local coinPart = child:IsA("BasePart") and child or child.Parent
+                            if coinPart and coinPart:IsA("BasePart") and coinPart.Transparency < 1 then
+                                root.CFrame = coinPart.CFrame
+                                collectedCoinsCount = collectedCoinsCount + 1
+                                collectedInThisTick = true
+                                task.wait(0.25) -- Плавный сбор без кика за скорость
+                            end
+                        end
+                    end
+                    
+                    if not collectedInThisTick then
+                        root.CFrame = safePointCFrame
+                    end
+                else
+                    root.CFrame = safePointCFrame
+                end
+            end
+        end
+
+        -- 4. АВТОМАТИЧЕСКИЙ УДАР/ВЫСТРЕЛ ПО УБИЙЦЕ (5 ВЫСТРЕЛОВ СКВОЗЬ СТЕНЫ)
+        if autoShootMurderer then
+            local gun = char:FindFirstChild("Gun") or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Gun"))
+            if gun then
+                local murderer = getMurdererPlayer()
+                if murderer and murderer.Character then
+                    local mRoot = murderer.Character:FindFirstChild("HumanoidRootPart") or murderer.Character:FindFirstChild("Head")
+                    if mRoot then
+                        if gun.Parent ~= char and hum then
+                            hum:EquipTool(gun)
+                            task.wait(0.1)
+                        end
+                        
+                        -- Стреляем 5 раз подряд для гарантии попадания сквозь стены (Wallbang)
+                        for i = 1, 5 do
+                            pcall(function()
+                                local originPos = root.Position
+                                local targetPos = mRoot.Position
+                                local originCFrame = CFrame.new(originPos, targetPos)
+                                local targetCFrame = CFrame.new(targetPos)
+                                
+                                -- Вызов RemoteEvent выстрела с обходом стен
+                                local shootEvent = gun:FindFirstChild("Shoot", true) or ReplicatedStorage:FindFirstChild("Shoot", true)
+                                if shootEvent then
+                                    shootEvent:FireServer(originCFrame, targetCFrame)
+                                else
+                                    gun:Activate()
+                                end
+                            end)
+                            task.wait(0.05)
+                        end
+                    end
+                end
+            end
+        end
+        
+    end
+end)
+
+Rayfield:Notify({Title = "MM2 Pro Farm Запущен!", Content = "Автофарм (40 монет), GodMode и Авто-убийца активированы.", Duration = 4})
