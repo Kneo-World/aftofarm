@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.6 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V1.7 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -81,13 +81,13 @@ local function getSheriffPlayer()
     return nil
 end
 
--- Плавный полет со скоростью 50 (без киков)
+-- Плавный полет со скоростью 30 (безопасно от киков)
 local function smoothFlyTo(targetCFrame)
     local char, hum, root = getCharacter()
     if not root then return end
     
     local distance = (root.Position - targetCFrame.Position).Magnitude
-    local timeVal = distance / 50 -- Скорость 50
+    local timeVal = distance / 30 -- Скорость 30
     
     if timeVal < 0.05 then
         root.CFrame = targetCFrame
@@ -185,38 +185,47 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: АВТО-ФАРМ (ИЩЕТ Coin_Server ВО ВСЕМ ВОРКСПЕЙСЕ) ====================
+-- ==================== ПОТОК 1: АВТО-ФАРМ (ПОИСК БЛИЖАЙШЕЙ МОНЕТЫ С ПАУЗОЙ 2.5 СЕК) ====================
 task.spawn(function()
     while true do
-        task.wait(0.2)
+        task.wait(0.3)
         if autoFarmActive then
             local char, hum, root = getCharacter()
             if char and root then
                 if collectedCoinsCount >= maxCoinsPerRound then
                     root.CFrame = safePointCFrame
                 else
-                    -- Ищем абсолютно все Coin_Server во всем Workspace (без привязки к конкретной папке)
-                    local coins = {}
+                    -- Ищем ближайшую монету по всему Workspace
+                    local nearestCoin = nil
+                    local shortestDistance = math.huge
+                    
                     for _, obj in ipairs(Workspace:GetDescendants()) do
                         if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
                             if obj.Parent then
-                                table.insert(coins, obj)
+                                local dist = (root.Position - obj.Position).Magnitude
+                                if dist < shortestDistance then
+                                    shortestDistance = dist
+                                    nearestCoin = obj
+                                end
                             end
                         end
                     end
 
-                    if #coins > 0 then
-                        for _, coinPart in ipairs(coins) do
-                            if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
-                            if coinPart and coinPart.Parent then
-                                smoothFlyTo(coinPart.CFrame)
-                                collectedCoinsCount = collectedCoinsCount + 1
-                                task.wait(0.1)
-                            end
+                    if nearestCoin and nearestCoin.Parent then
+                        -- Летим к ближайшей монете со скоростью 30
+                        smoothFlyTo(nearestCoin.CFrame)
+                        collectedCoinsCount = collectedCoinsCount + 1
+                        
+                        -- Ждем 2.5 секунды перед полетом к следующей монете (защита от Error 267)
+                        local waitElapsed = 0
+                        while waitElapsed < 2.5 do
+                            if not autoFarmActive then break end
+                            waitElapsed = waitElapsed + 0.1
+                            task.wait(0.1)
                         end
                     else
                         -- Если монет на карте нет вообще, ждем появления
-                        task.wait(0.5)
+                        task.wait(1)
                     end
                 end
             end
@@ -297,4 +306,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Скрипт готов!", Content = "Поиск Coin_Server по всему Workspace активирован.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Скрипт обновлен!", Content = "Скорость 30, поиск ближайшей монеты и задержка активированы.", Duration = 4})
