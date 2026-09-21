@@ -185,10 +185,10 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: АВТО-ФАРМ МОНЕТ (НЕЗАВИСИМЫЙ) ====================
+-- ==================== ПОТОК 1: АВТО-ФАРМ МОНЕТ (РАБОТАЕТ ВСЕГДА САМОСТОЯТЕЛЬНО) ====================
 task.spawn(function()
     while true do
-        task.wait(0.5)
+        task.wait(0.3)
         if autoFarmActive then
             local char, hum, root = getCharacter()
             if char and root then
@@ -211,9 +211,6 @@ task.spawn(function()
                                 task.wait(0.1)
                             end
                         end
-                    else
-                        -- Если монет нет на карте, ждем чуток
-                        task.wait(1)
                     end
                 end
             end
@@ -226,18 +223,12 @@ task.spawn(function()
     while true do
         task.wait(0.3)
         
-        -- Если автофарм активен и еще не собрал 40 монет, бой не трогаем, чтобы не мешать фарму
-        if autoFarmActive and collectedCoinsCount < maxCoinsPerRound then
-            continue
-        end
-
         local char, hum, root = getCharacter()
         if not char or not root or not hum then continue end
 
-        -- 1. Проверяем шерифа / пистолет / сейф
-        local sheriff = getSheriffPlayer()
-        
+        -- 1. Проверяем шерифа / пистолет / сейф (только если включено)
         if sheriffFlingActive then
+            local sheriff = getSheriffPlayer()
             if sheriff and sheriff ~= LocalPlayer and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
                 -- Рваним шерифа
                 local sheriffRoot = sheriff.Character.HumanoidRootPart
@@ -262,8 +253,10 @@ task.spawn(function()
                         firetouchinterest(root, gunDrop, 1)
                     end
                 else
-                    -- Нет ни шерифа, ни пистолета -> уходим в сейф
-                    root.CFrame = safePointCFrame
+                    -- Нет ни шерифа, ни пистолета -> если фарм выключен или собрал 40 монет, уходим в сейф
+                    if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then
+                        root.CFrame = safePointCFrame
+                    end
                 end
             end
         end
@@ -301,4 +294,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Скрипт обновлен!", Content = "Потоки разделены: фарм и бой работают стабильно.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Скрипт готов!", Content = "Автофарм теперь работает независимо от других функций.", Duration = 4})
