@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V2.2 (UNIVERSAL COIN FINDER)67
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.3 (PARTS COIN FIX)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -79,18 +79,17 @@ local function getSheriffPlayer()
     return nil
 end
 
--- Универсальный поиск монет (ищет по ключевым словам в имени)
+-- Точный поиск монет-партов
 local function findNearestCoin(rootPos)
     local nearestCoin = nil
     local shortestDistance = math.huge
 
-    -- Проходим по всем объектам в Workspace
     for _, obj in ipairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart") then
-            local nameLower = string.lower(obj.Name)
-            -- Ищем объекты, похожие на монеты, ивентовые штуки или контейнеры монет
-            if string.find(nameLower, "coin") or string.find(nameLower, "token") or string.find(nameLower, "candy") then
-                if obj.Parent and (obj.Position - rootPos).Magnitude < 300 then
+        -- Монеты в MM2 — это BasePart (Part / MeshPart)
+        if obj:IsA("BasePart") then
+            local name = string.lower(obj.Name)
+            if name == "coin_server" or name == "coin" or string.find(name, "coin") then
+                if obj.Parent then
                     local dist = (rootPos - obj.Position).Magnitude
                     if dist < shortestDistance then
                         shortestDistance = dist
@@ -105,7 +104,7 @@ end
 
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm (Universal)",
+   Name = "💰 MM2 PRO Auto-Farm (Parts Fix)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -119,7 +118,7 @@ local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмер
 FarmTab:CreateSection("Управление Авто-Фармом")
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Авто-Фарм",
+   Name = "💰 Включить Авто-Фарм (Парты)",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -181,7 +180,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: УНИВЕРСАЛЬНЫЙ АВТО-ФАРМ ====================
+-- ==================== ПОТОК 1: НАДЕЖНЫЙ СБОР ПАРТ-МОНЕТ ====================
 task.spawn(function()
     while true do
         task.wait(0.2)
@@ -195,14 +194,11 @@ task.spawn(function()
             continue
         end
 
-        -- Проверка количества монет на карте для сброса лимита раунда
+        -- Считаем монеты для сброса лимита нового раунда
         local totalCoinsOnMap = 0
         for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") then
-                local n = string.lower(obj.Name)
-                if string.find(n, "coin") or string.find(n, "token") then
-                    if obj.Parent then totalCoinsOnMap = totalCoinsOnMap + 1 end
-                end
+            if obj:IsA("BasePart") and string.find(string.lower(obj.Name), "coin") then
+                if obj.Parent then totalCoinsOnMap = totalCoinsOnMap + 1 end
             end
         end
 
@@ -210,20 +206,20 @@ task.spawn(function()
             collectedCoinsCount = 0
         end
 
-        -- Если лимит собран — летим в сейф
+        -- Если собрали лимит — в сейф
         if collectedCoinsCount >= maxCoinsPerRound then
             root.CFrame = safePointCFrame
             task.wait(1)
             continue
         end
 
-        -- Ищем монету через универсальный поиск
+        -- Ищем ближайшую монету-парт
         local nearestCoin = findNearestCoin(root.Position)
 
         if nearestCoin and nearestCoin.Parent then
             local targetPos = nearestCoin.Position
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
-                local _, _, currentHum, currentRoot = getCharacter()
+                local _, _, _, currentRoot = getCharacter()
                 if not currentRoot then break end
                 
                 local currentPos = currentRoot.Position
@@ -235,7 +231,7 @@ task.spawn(function()
                 end
                 
                 local moveDir = (targetPos - currentPos).Unit
-                currentRoot.CFrame = CFrame.new(currentPos + moveDir * math.min(distance, 35 * 0.05), targetPos)
+                currentRoot.CFrame = CFrame.new(currentPos + moveDir * math.min(distance, 40 * 0.05), targetPos)
                 currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 
                 task.wait(0.05)
@@ -244,7 +240,7 @@ task.spawn(function()
             local _, _, aliveRoot = getCharacter()
             if aliveRoot and autoFarmActive then
                 collectedCoinsCount = collectedCoinsCount + 1
-                task.wait(0.3)
+                task.wait(0.2)
             end
         else
             task.wait(1)
@@ -333,4 +329,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт обновлен (V2.2)", Content = "Универсальный поиск монет активирован!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт обновлен (V2.3)", Content = "Сбор партов-монет активирован!", Duration = 4})
