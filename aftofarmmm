@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.4 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V1.5 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -22,7 +22,6 @@ local sheriffFlingActive = true
 local autoGrabGun = true
 
 local safePointCFrame = CFrame.new(0, 100, 0)
-local originalPosition = nil
 
 -- ========== Вспомогательные функции ==========
 local function getCharacter()
@@ -82,14 +81,13 @@ local function getSheriffPlayer()
     return nil
 end
 
--- Функция плавного полета к монете со скоростью ~50 (без киков за телепорт)
-local function smoothFlyTo(targetCFrame, speed)
+-- Плавный полет со скоростью 50 (без киков)
+local function smoothFlyTo(targetCFrame)
     local char, hum, root = getCharacter()
     if not root then return end
     
-    speed = speed or 50 -- Скорость полета
     local distance = (root.Position - targetCFrame.Position).Magnitude
-    local timeVal = distance / speed
+    local timeVal = distance / 50 -- Скорость 50
     
     if timeVal < 0.05 then
         root.CFrame = targetCFrame
@@ -100,7 +98,6 @@ local function smoothFlyTo(targetCFrame, speed)
     local tween = TweenService:Create(root, tweenInfo, {CFrame = targetCFrame})
     tween:Play()
     
-    -- Ждем окончания полета, но проверяем условие отмены
     local elapsed = 0
     while elapsed < timeVal do
         if not autoFarmActive then
@@ -133,10 +130,6 @@ FarmTab:CreateToggle({
    Callback = function(Value)
       autoFarmActive = Value
       collectedCoinsCount = 0
-      local _, _, root = getCharacter()
-      if Value and root then
-          originalPosition = root.CFrame
-      end
    end,
 })
 
@@ -192,20 +185,61 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ГЛАВНЫЙ ЦИКЛ БОЯ И ФАРМА ====================
+-- ==================== ПОТОК 1: АВТО-ФАРМ МОНЕТ (НЕЗАВИСИМЫЙ) ====================
 task.spawn(function()
     while true do
-        task.wait(0.2)
+        task.wait(0.5)
+        if autoFarmActive then
+            local char, hum, root = getCharacter()
+            if char and root then
+                if collectedCoinsCount >= maxCoinsPerRound then
+                    root.CFrame = safePointCFrame
+                else
+                    local coins = {}
+                    for _, obj in ipairs(Workspace:GetDescendants()) do
+                        if obj.Name == "Coin_Server" and obj:IsA("BasePart") and obj.Transparency < 1 then
+                            table.insert(coins, obj)
+                        end
+                    end
+
+                    if #coins > 0 then
+                        for _, coinPart in ipairs(coins) do
+                            if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
+                            if coinPart and coinPart.Parent then
+                                smoothFlyTo(coinPart.CFrame)
+                                collectedCoinsCount = collectedCoinsCount + 1
+                                task.wait(0.1)
+                            end
+                        end
+                    else
+                        -- Если монет нет на карте, ждем чуток
+                        task.wait(1)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- ==================== ПОТОК 2: БОЕВАЯ СИСТЕМА (ШЕРИФ, ПИСТОЛЕТ, УБИЙЦА) ====================
+task.spawn(function()
+    while true do
+        task.wait(0.3)
         
+        -- Если автофарм активен и еще не собрал 40 монет, бой не трогаем, чтобы не мешать фарму
+        if autoFarmActive and collectedCoinsCount < maxCoinsPerRound then
+            continue
+        end
+
         local char, hum, root = getCharacter()
         if not char or not root or not hum then continue end
 
-        -- 1. СМЕРТЕЛЬНЫЙ ЦИКЛ РОЛЕЙ (Шериф -> Пистолет -> Сейф -> Убийца)
+        -- 1. Проверяем шерифа / пистолет / сейф
         local sheriff = getSheriffPlayer()
         
         if sheriffFlingActive then
             if sheriff and sheriff ~= LocalPlayer and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
-                -- А) Если есть шериф — рваним его за карту
+                -- Рваним шерифа
                 local sheriffRoot = sheriff.Character.HumanoidRootPart
                 local oldPos = root.CFrame
                 local startTime = tick()
@@ -218,56 +252,23 @@ task.spawn(function()
                 end
                 root.CFrame = oldPos
             else
-                -- Б) Если шерифа нет, ищем пистолет на земле
+                -- Шерифа нет -> ищем пистолет
                 local gunDrop = Workspace:FindFirstChild("GunDrop", true) or Workspace:FindFirstChild("Gun", true)
                 if gunDrop and gunDrop:IsA("BasePart") then
-                    -- Плавный подлет к пистолету
-                    smoothFlyTo(gunDrop.CFrame, 50)
+                    root.CFrame = gunDrop.CFrame
                     if firetouchinterest then
                         firetouchinterest(root, gunDrop, 0)
                         task.wait(0.05)
                         firetouchinterest(root, gunDrop, 1)
                     end
                 else
-                    -- В) Если шерифа нет И пистолета нет на карте — уходим в сейф-зону
-                    if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then
-                        root.CFrame = safePointCFrame
-                    end
-                end
-            end
-        end
-
-        -- 2. АВТО-ФАРМ МОНЕТ (Плавный полет со скоростью 50 до 40 монет)
-        if autoFarmActive then
-            if collectedCoinsCount >= maxCoinsPerRound then
-                root.CFrame = safePointCFrame
-            else
-                local coins = {}
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
-                        if obj.Transparency < 1 then
-                            table.insert(coins, obj)
-                        end
-                    end
-                end
-
-                if #coins > 0 then
-                    for _, coinPart in ipairs(coins) do
-                        if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
-                        if coinPart and coinPart.Parent and coinPart.Transparency < 1 then
-                            -- Летим к монете плавно, чтобы античит не кикал
-                            smoothFlyTo(coinPart.CFrame, 50)
-                            collectedCoinsCount = collectedCoinsCount + 1
-                            task.wait(0.1)
-                        end
-                    end
-                else
+                    -- Нет ни шерифа, ни пистолета -> уходим в сейф
                     root.CFrame = safePointCFrame
                 end
             end
         end
 
-        -- 3. АВТО-УБИЙСТВО УБИЙЦЫ С ФИКСАЦИЕЙ (Защита от удара ножом)
+        -- 2. Авто-убийство убийцы с фиксацией позиции
         if autoShootMurderer then
             local gun = char:FindFirstChild("Gun") or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Gun"))
             if gun then
@@ -280,13 +281,9 @@ task.spawn(function()
                             task.wait(0.1)
                         end
                         
-                        -- Телепортируемся прямо внутрь/за спину убийцы и фиксируем позицию, 
-                        -- чтобы у него сбивался хитбокс удара (он не сможет ударить в упор)
                         for i = 1, 5 do
                             pcall(function()
-                                -- Держимся прямо вплотную к его спине/голове
                                 root.CFrame = mRoot.CFrame * CFrame.new(0, 0, 1.5)
-                                
                                 local shootEvent = gun:FindFirstChild("Shoot", true) or ReplicatedStorage:FindFirstChild("Shoot", true)
                                 if shootEvent then
                                     shootEvent:FireServer(root.CFrame, mRoot.CFrame)
@@ -304,4 +301,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Anti-Kick Запущен!", Content = "Плавный фарм (скорость 50) и защита от киков активны.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Скрипт обновлен!", Content = "Потоки разделены: фарм и бой работают стабильно.", Duration = 4})
