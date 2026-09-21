@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V2.4 (COIN CONTAINER FIX)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.4 (COIN CONTAINER FIX)666
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
