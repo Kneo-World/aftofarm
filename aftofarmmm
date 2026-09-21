@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & GODMODE V1.1 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & GODMODE V1.2 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -11,7 +11,7 @@ local Workspace = game:GetService("Workspace")
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- ========== Переменные состояния ==========
+-- ========== Переменные состояний ==========
 local autoFarmActive = false
 local collectedCoinsCount = 0
 local maxCoinsPerRound = 40
@@ -55,7 +55,6 @@ local function getMurdererPlayer()
             return Players:FindFirstChild(plrName)
         end
     end
-    -- Запасной поиск по предмету Knife
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character then
             if plr.Character:FindFirstChild("Knife") or (plr:FindFirstChild("Backpack") and plr.Backpack:FindFirstChild("Knife")) then
@@ -154,11 +153,9 @@ RunService.Stepped:Connect(function()
     if not godModeActive then return end
     local char, hum, _ = getCharacter()
     if char and hum then
-        -- Отключаем состояния урона и падения
         hum:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
         hum:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
         
-        -- Убираем коллизию с другими игроками, чтобы не давать себя задеть
         for _, plr in ipairs(Players:GetPlayers()) do
             if plr ~= LocalPlayer and plr.Character then
                 for _, part in ipairs(plr.Character:GetChildren()) do
@@ -171,7 +168,7 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ГЛАВНЫЙ ЦИКЛ АВТО-ФАРМА И БОЯ ====================
+-- ==================== ГЛАВНЫЙ ЦИКЛ (ФАРМ, ШЕРИФ, ОРУЖИЕ, УБИЙЦА) ====================
 task.spawn(function()
     while true do
         task.wait(0.2)
@@ -179,18 +176,15 @@ task.spawn(function()
         local char, hum, root = getCharacter()
         if not char or not root or not hum then continue end
 
-        -- 1. ЛОГИКА РВАНКИ ШЕРИФА (если включено и есть шериф)
+        -- 1. ЛОГИКА РВАНКИ ШЕРИФА
         if sheriffFlingActive then
             local sheriff = getSheriffPlayer()
             if sheriff and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
                 local sheriffRoot = sheriff.Character.HumanoidRootPart
-                -- Проверяем, что шериф не мы сами
                 if sheriff ~= LocalPlayer then
-                    -- Быстро рваним шерифа за карту (телепорт под карту / далеко вверх)
                     local oldPos = root.CFrame
                     local startTime = tick()
                     
-                    -- Выполняем короткую рванку шерифа
                     while sheriff and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") and (tick() - startTime < 1.5) do
                         root.CFrame = sheriffRoot.CFrame
                         root.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
@@ -216,22 +210,12 @@ task.spawn(function()
             end
         end
 
-       -- ==================== ИДЕАЛЬНЫЙ АВТО-ФАРМ (ПОИСК Coin_Server) ====================
-task.spawn(function()
-    while true do
-        task.wait(0.2)
-        
+        -- 3. АВТО-ФАРМ МОНЕТ (ПОИСК Coin_Server ВО ВСЕМ ВОРКСПЕЙСЕ)
         if autoFarmActive then
-            local char, hum, root = getCharacter()
-            if not char or not root then continue end
-
             if collectedCoinsCount >= maxCoinsPerRound then
-                -- Достигли лимита в 40 монет — уходим на безопасную точку
                 root.CFrame = safePointCFrame
             else
                 local coins = {}
-                
-                -- Ищем все объекты с именем "Coin_Server" во всем Workspace
                 for _, obj in ipairs(Workspace:GetDescendants()) do
                     if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
                         if obj.Transparency < 1 then
@@ -244,23 +228,10 @@ task.spawn(function()
                     for _, coinPart in ipairs(coins) do
                         if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
                         if coinPart and coinPart.Parent and coinPart.Transparency < 1 then
-                            -- Телепортируемся к конкретному Coin_Server
                             root.CFrame = coinPart.CFrame
                             collectedCoinsCount = collectedCoinsCount + 1
-                            task.wait(0.25) -- Плавная задержка для засчета монеты
+                            task.wait(0.25)
                         end
-                    end
-                else
-                    -- Если монет нет на карте, ждем на безопасной точке
-                    root.CFrame = safePointCFrame
-                end
-            end
-        end
-    end
-end)
-                    
-                    if not collectedInThisTick then
-                        root.CFrame = safePointCFrame
                     end
                 else
                     root.CFrame = safePointCFrame
@@ -268,7 +239,7 @@ end)
             end
         end
 
-        -- 4. АВТОМАТИЧЕСКИЙ УДАР/ВЫСТРЕЛ ПО УБИЙЦЕ (5 ВЫСТРЕЛОВ СКВОЗЬ СТЕНЫ)
+        -- 4. АВТОМАТИЧЕСКИЙ ВЫСТРЕЛ ПО УБИЙЦЕ (5 ВЫСТРЕЛОВ СКВОЗЬ СТЕНЫ)
         if autoShootMurderer then
             local gun = char:FindFirstChild("Gun") or (LocalPlayer:FindFirstChild("Backpack") and LocalPlayer.Backpack:FindFirstChild("Gun"))
             if gun then
@@ -281,7 +252,6 @@ end)
                             task.wait(0.1)
                         end
                         
-                        -- Стреляем 5 раз подряд для гарантии попадания сквозь стены (Wallbang)
                         for i = 1, 5 do
                             pcall(function()
                                 local originPos = root.Position
@@ -289,7 +259,6 @@ end)
                                 local originCFrame = CFrame.new(originPos, targetPos)
                                 local targetCFrame = CFrame.new(targetPos)
                                 
-                                -- Вызов RemoteEvent выстрела с обходом стен
                                 local shootEvent = gun:FindFirstChild("Shoot", true) or ReplicatedStorage:FindFirstChild("Shoot", true)
                                 if shootEvent then
                                     shootEvent:FireServer(originCFrame, targetCFrame)
@@ -307,4 +276,4 @@ end)
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Pro Farm Запущен!", Content = "Автофарм (40 монет), GodMode и Авто-убийца активированы.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Pro Farm Запущен!", Content = "Автофарм (40 монет), GodMode и Авто-убийца успешно активированы.", Duration = 4})
