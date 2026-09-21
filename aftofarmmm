@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & GODMODE V1.0 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & GODMODE V1.1 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
