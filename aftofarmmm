@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.7 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V1.8 (INFINITE AFK)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -111,7 +111,7 @@ end
 
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm & Anti-Kick",
+   Name = "💰 MM2 PRO Auto-Farm (AFK Mode)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -122,10 +122,10 @@ local FarmTab = Window:CreateTab("🚀 Авто-Фарм & Убийца", 448336
 local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмертие", 4483362458)
 
 -- ==================== ВКЛАДКА ФАРМА ====================
-FarmTab:CreateSection("Управление Авто-Фармом (Цель: 40 монет)")
+FarmTab:CreateSection("Управление Бесконечным Авто-Фармом")
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Плавный Авто-Фарм",
+   Name = "💰 Включить Бесконечный Авто-Фарм",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -134,7 +134,7 @@ FarmTab:CreateToggle({
 })
 
 FarmTab:CreateButton({
-   Name = "📌 Установить Safe-Точку (Куда прятаться)",
+   Name = "📌 Установить Safe-Точку (Куда прятаться при лимите)",
    Callback = function()
       local _, _, root = getCharacter()
       if root then
@@ -185,15 +185,38 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: АВТО-ФАРМ (ПОИСК БЛИЖАЙШЕЙ МОНЕТЫ С ПАУЗОЙ 2.5 СЕК) ====================
+-- ==================== ПОТОК 1: БЕСКОНЕЧНЫЙ АВТО-ФАРМ (ВЕЧНЫЙ ЦИКЛ) ====================
 task.spawn(function()
     while true do
-        task.wait(0.3)
+        task.wait(0.5)
         if autoFarmActive then
             local char, hum, root = getCharacter()
             if char and root then
+                -- Если собрали 40 монет за раунд, уходим в сейф и ждем начала нового раунда
                 if collectedCoinsCount >= maxCoinsPerRound then
                     root.CFrame = safePointCFrame
+                    
+                    -- Ждем пока на карте снова появятся монеты (начало нового раунда)
+                    local newRoundStarted = false
+                    while not newRoundStarted do
+                        if not autoFarmActive then break end
+                        task.wait(2)
+                        
+                        local checkCoinsCount = 0
+                        for _, obj in ipairs(Workspace:GetDescendants()) do
+                            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
+                                if obj.Parent then
+                                    checkCoinsCount = checkCoinsCount + 1
+                                end
+                            end
+                        end
+                        
+                        -- Как только монеты появились снова — сбрасываем счетчик и летим дальше фармить
+                        if checkCoinsCount > 5 then
+                            collectedCoinsCount = 0
+                            newRoundStarted = true
+                        end
+                    end
                 else
                     -- Ищем ближайшую монету по всему Workspace
                     local nearestCoin = nil
@@ -216,7 +239,7 @@ task.spawn(function()
                         smoothFlyTo(nearestCoin.CFrame)
                         collectedCoinsCount = collectedCoinsCount + 1
                         
-                        -- Ждем 2.5 секунды перед полетом к следующей монете (защита от Error 267)
+                        -- Пауза 2.5 секунды для безопасности от античита (Error 267)
                         local waitElapsed = 0
                         while waitElapsed < 2.5 do
                             if not autoFarmActive then break end
@@ -224,7 +247,7 @@ task.spawn(function()
                             task.wait(0.1)
                         end
                     else
-                        -- Если монет на карте нет вообще, ждем появления
+                        -- Если монет нет, ждем немного перед повторным сканированием
                         task.wait(1)
                     end
                 end
@@ -306,4 +329,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Скрипт обновлен!", Content = "Скорость 30, поиск ближайшей монеты и задержка активированы.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Бесконечный AFK Фарм запущен!", Content = "Теперь скрипт будет фармить монеты раунд за раундом автоматически.", Duration = 4})
