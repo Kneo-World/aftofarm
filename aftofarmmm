@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.9 (ULTIMATE AFK & RESPAWN)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V2.0 (INSTANT CHECK)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -87,7 +87,7 @@ local function smoothFlyTo(targetCFrame)
     if not root then return end
     
     local distance = (root.Position - targetCFrame.Position).Magnitude
-    local timeVal = distance / 30 -- Скорость 30
+    local timeVal = distance / 30
     
     if timeVal < 0.05 then
         root.CFrame = targetCFrame
@@ -100,11 +100,11 @@ local function smoothFlyTo(targetCFrame)
     
     local elapsed = 0
     while elapsed < timeVal do
+        -- Если автофарм выключили на лету — сразу отменяем полет
         if not autoFarmActive then
             tween:Cancel()
             break
         end
-        -- Если умерли прямо во время полета — прерываем твин
         local _, _, currentRoot = getCharacter()
         if not currentRoot then
             tween:Cancel()
@@ -117,7 +117,7 @@ end
 
 -- ==================== ОКНО ИНТЕРФЕЙСА (RAYFIELD) ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 PRO Auto-Farm (Ultimate AFK)",
+   Name = "💰 MM2 PRO Auto-Farm (Instant Check)",
    LoadingTitle = "Загрузка системы...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -128,14 +128,16 @@ local FarmTab = Window:CreateTab("🚀 Авто-Фарм & Убийца", 448336
 local SettingsTab = Window:CreateTab("⚙️ Настройки & Бессмертие", 4483362458)
 
 -- ==================== ВКЛАДКА ФАРМА ====================
-FarmTab:CreateSection("Управление Бесконечным Авто-Фармом")
+FarmTab:CreateSection("Управление Авто-Фармом")
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Бесконечный Авто-Фарм",
+   Name = "💰 Включить Авто-Фарм (Мгновенный старт)",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
-      collectedCoinsCount = 0
+      if Value then
+          collectedCoinsCount = 0
+      end
    end,
 })
 
@@ -191,88 +193,82 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: БЕСКОНЕЧНЫЙ АВТО-ФАРМ С АВТО-РЕЖИМОМ ПОСЛЕ СМЕРТИ ====================
+-- ==================== ПОТОК 1: ПОСТОЯННАЯ ПРОВЕРКА И ФАРМ ====================
 task.spawn(function()
     while true do
-        task.wait(0.5)
-        if autoFarmActive then
-            local char, hum, root = getCharacter()
+        task.wait(0.2) -- Проверяем состояние каждые 0.2 секунды
+        
+        -- Главное условие: если фарм выключен тумблером, просто пропускаем цикл
+        if not autoFarmActive then
+            continue
+        end
+
+        local char, hum, root = getCharacter()
+        if not char or not root or not hum then
+            continue -- Если персонаж умер или грузится, ждем следующий тик
+        end
+
+        -- Сбрасываем счетчик если начался новый раунд (монет снова много на карте)
+        local totalCoinsOnMap = 0
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
+                if obj.Parent then
+                    totalCoinsOnMap = totalCoinsOnMap + 1
+                end
+            end
+        end
+
+        if totalCoinsOnMap > 5 and collectedCoinsCount >= maxCoinsPerRound then
+            collectedCoinsCount = 0
+        end
+
+        -- Если собрали лимит за раунд, уходим в сейф
+        if collectedCoinsCount >= maxCoinsPerRound then
+            root.CFrame = safePointCFrame
+            task.wait(1)
+            continue
+        end
+
+        -- Ищем ближайшую монету
+        local nearestCoin = nil
+        local shortestDistance = math.huge
+        
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
+                if obj.Parent then
+                    local dist = (root.Position - obj.Position).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
+                        nearestCoin = obj
+                    end
+                end
+            end
+        end
+
+        if nearestCoin and nearestCoin.Parent then
+            -- Летим к монете
+            smoothFlyTo(nearestCoin.CFrame)
             
-            -- Если персонаж умер или еще не загрузился, ждем возрождения и не ломаем цикл
-            if not char or not root or not hum then
-                task.wait(1)
-                continue
-            end
-
-            -- Если собрали 40 монет за раунд, уходим в сейф и ждем нового раунда
-            if collectedCoinsCount >= maxCoinsPerRound then
-                root.CFrame = safePointCFrame
+            -- Проверяем, не выключили ли фарм во время полета
+            if not autoFarmActive then continue end
+            
+            local _, _, aliveRoot = getCharacter()
+            if aliveRoot then
+                collectedCoinsCount = collectedCoinsCount + 1
                 
-                local newRoundStarted = false
-                while not newRoundStarted do
+                -- Небольшая легитимная пауза перед следующей монетой, но с постоянной проверкой тумблера
+                local waitTime = 0
+                while waitTime < 2.0 do
                     if not autoFarmActive then break end
-                    
-                    -- Проверяем жив ли еще персонаж во время ожидания
-                    local _, _, checkRoot = getCharacter()
-                    if not checkRoot then break end
-                    
-                    task.wait(2)
-                    
-                    local checkCoinsCount = 0
-                    for _, obj in ipairs(Workspace:GetDescendants()) do
-                        if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
-                            if obj.Parent then
-                                checkCoinsCount = checkCoinsCount + 1
-                            end
-                        end
-                    end
-                    
-                    if checkCoinsCount > 5 then
-                        collectedCoinsCount = 0
-                        newRoundStarted = true
-                    end
-                end
-            else
-                -- Ищем ближайшую монету по всему Workspace
-                local nearestCoin = nil
-                local shortestDistance = math.huge
-                
-                for _, obj in ipairs(Workspace:GetDescendants()) do
-                    if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
-                        if obj.Parent then
-                            local dist = (root.Position - obj.Position).Magnitude
-                            if dist < shortestDistance then
-                                shortestDistance = dist
-                                nearestCoin = obj
-                            end
-                        end
-                    end
-                end
-
-                if nearestCoin and nearestCoin.Parent then
-                    -- Летим к ближайшей монете со скоростью 30
-                    smoothFlyTo(nearestCoin.CFrame)
-                    
-                    -- Проверяем, живы ли после полета
-                    local _, _, aliveRoot = getCharacter()
-                    if aliveRoot then
-                        collectedCoinsCount = collectedCoinsCount + 1
-                        
-                        -- Пауза 2.5 секунды для безопасности от античита
-                        local waitElapsed = 0
-                        while waitElapsed < 2.5 do
-                            if not autoFarmActive then break end
-                            local _, _, rCheck = getCharacter()
-                            if not rCheck then break end -- прерываем паузу если умерли
-                            waitElapsed = waitElapsed + 0.1
-                            task.wait(0.1)
-                        end
-                    end
-                else
-                    -- Если монет нет, ждем появления
-                    task.wait(1)
+                    local _, _, rCheck = getCharacter()
+                    if not rCheck then break end
+                    waitTime = waitTime + 0.2
+                    task.wait(0.2)
                 end
             end
+        else
+            -- Если монет нет на карте вообще, ждем секунду и проверяем снова
+            task.wait(1)
         end
     end
 end)
@@ -358,4 +354,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 AFK Фарм защищен от смерти!", Content = "Теперь скрипт не ломается при гибели персонажа.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Скрипт обновлен (V2.0)", Content = "Мгновенная проверка статуса тумблера активирована.", Duration = 4})
