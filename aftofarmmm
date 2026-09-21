@@ -216,28 +216,48 @@ task.spawn(function()
             end
         end
 
-        -- 3. ЛОГИКА АВТОФАРМА МОНЕТ (ДО 40 ШТУК)
+       -- ==================== ИДЕАЛЬНЫЙ АВТО-ФАРМ (ПОИСК Coin_Server) ====================
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        
         if autoFarmActive then
+            local char, hum, root = getCharacter()
+            if not char or not root then continue end
+
             if collectedCoinsCount >= maxCoinsPerRound then
                 -- Достигли лимита в 40 монет — уходим на безопасную точку
                 root.CFrame = safePointCFrame
             else
-                local coinContainer = Workspace:FindFirstChild("Normal") or Workspace:FindFirstChild("CoinContainer", true)
-                if coinContainer then
-                    local collectedInThisTick = false
-                    for _, child in ipairs(coinContainer:GetDescendants()) do
-                        if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
-                        
-                        if child.Name == "Coin" or child.Name == "CoinContainer" or child:IsA("TouchTransmitter") then
-                            local coinPart = child:IsA("BasePart") and child or child.Parent
-                            if coinPart and coinPart:IsA("BasePart") and coinPart.Transparency < 1 then
-                                root.CFrame = coinPart.CFrame
-                                collectedCoinsCount = collectedCoinsCount + 1
-                                collectedInThisTick = true
-                                task.wait(0.25) -- Плавный сбор без кика за скорость
-                            end
+                local coins = {}
+                
+                -- Ищем все объекты с именем "Coin_Server" во всем Workspace
+                for _, obj in ipairs(Workspace:GetDescendants()) do
+                    if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
+                        if obj.Transparency < 1 then
+                            table.insert(coins, obj)
                         end
                     end
+                end
+
+                if #coins > 0 then
+                    for _, coinPart in ipairs(coins) do
+                        if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then break end
+                        if coinPart and coinPart.Parent and coinPart.Transparency < 1 then
+                            -- Телепортируемся к конкретному Coin_Server
+                            root.CFrame = coinPart.CFrame
+                            collectedCoinsCount = collectedCoinsCount + 1
+                            task.wait(0.25) -- Плавная задержка для засчета монеты
+                        end
+                    end
+                else
+                    -- Если монет нет на карте, ждем на безопасной точке
+                    root.CFrame = safePointCFrame
+                end
+            end
+        end
+    end
+end)
                     
                     if not collectedInThisTick then
                         root.CFrame = safePointCFrame
