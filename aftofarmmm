@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM & COMBAT V1.5 (BY KNEO WORLD)
+-- MM2 ULTIMATE AUTO-FARM & COMBAT V1.6 (BY KNEO WORLD)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -185,20 +185,23 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ==================== ПОТОК 1: АВТО-ФАРМ МОНЕТ (РАБОТАЕТ ВСЕГДА САМОСТОЯТЕЛЬНО) ====================
+-- ==================== ПОТОК 1: АВТО-ФАРМ (ИЩЕТ Coin_Server ВО ВСЕМ ВОРКСПЕЙСЕ) ====================
 task.spawn(function()
     while true do
-        task.wait(0.3)
+        task.wait(0.2)
         if autoFarmActive then
             local char, hum, root = getCharacter()
             if char and root then
                 if collectedCoinsCount >= maxCoinsPerRound then
                     root.CFrame = safePointCFrame
                 else
+                    -- Ищем абсолютно все Coin_Server во всем Workspace (без привязки к конкретной папке)
                     local coins = {}
                     for _, obj in ipairs(Workspace:GetDescendants()) do
-                        if obj.Name == "Coin_Server" and obj:IsA("BasePart") and obj.Transparency < 1 then
-                            table.insert(coins, obj)
+                        if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
+                            if obj.Parent then
+                                table.insert(coins, obj)
+                            end
                         end
                     end
 
@@ -211,6 +214,9 @@ task.spawn(function()
                                 task.wait(0.1)
                             end
                         end
+                    else
+                        -- Если монет на карте нет вообще, ждем появления
+                        task.wait(0.5)
                     end
                 end
             end
@@ -230,7 +236,6 @@ task.spawn(function()
         if sheriffFlingActive then
             local sheriff = getSheriffPlayer()
             if sheriff and sheriff ~= LocalPlayer and sheriff.Character and sheriff.Character:FindFirstChild("HumanoidRootPart") then
-                -- Рваним шерифа
                 local sheriffRoot = sheriff.Character.HumanoidRootPart
                 local oldPos = root.CFrame
                 local startTime = tick()
@@ -243,7 +248,6 @@ task.spawn(function()
                 end
                 root.CFrame = oldPos
             else
-                -- Шерифа нет -> ищем пистолет
                 local gunDrop = Workspace:FindFirstChild("GunDrop", true) or Workspace:FindFirstChild("Gun", true)
                 if gunDrop and gunDrop:IsA("BasePart") then
                     root.CFrame = gunDrop.CFrame
@@ -253,7 +257,6 @@ task.spawn(function()
                         firetouchinterest(root, gunDrop, 1)
                     end
                 else
-                    -- Нет ни шерифа, ни пистолета -> если фарм выключен или собрал 40 монет, уходим в сейф
                     if not autoFarmActive or collectedCoinsCount >= maxCoinsPerRound then
                         root.CFrame = safePointCFrame
                     end
@@ -294,4 +297,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "MM2 Скрипт готов!", Content = "Автофарм теперь работает независимо от других функций.", Duration = 4})
+Rayfield:Notify({Title = "MM2 Скрипт готов!", Content = "Поиск Coin_Server по всему Workspace активирован.", Duration = 4})
