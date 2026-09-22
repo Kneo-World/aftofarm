@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V2.7 (DEEP RECURSIVE COIN_SERVER SEARCH)
+-- MM2 ULTIMATE AUTO-FARM V2.9 (UNDERMAP STEALTH FARM + 1.5S DELAY)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -25,29 +25,27 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Auto-Farm (Deep Search V2.7)",
-   LoadingTitle = "Загрузка...",
+   Name = "💰 MM2 Undermap Farm (Stealth V2.9)",
+   LoadingTitle = "Загрузка стелс-режима...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
-local FarmTab = Window:CreateTab("🚀 Фарм", 4483362458)
+local FarmTab = Window:CreateTab("🚀 Стелс-Фарм", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Авто-Фарм",
+   Name = "💰 Включить Подземный Авто-Фарм",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
-      print("[AUTO-FARM] Статус изменен на:", Value)
-      if Value then
-          collectedCoinsCount = 0
-      end
+      print("[AUTO-FARM] Статус:", Value)
+      if Value then collectedCoinsCount = 0 end
    end,
 })
 
 FarmTab:CreateButton({
-   Name = "📌 Сохранить Safe-Точку",
+   Name = "📌 Сохранить Safe-Точку (на всякий случай)",
    Callback = function()
       local _, _, root = getCharacter()
       if root then
@@ -57,32 +55,28 @@ FarmTab:CreateButton({
    end,
 })
 
--- Функция для глубокого поиска ВСЕХ Coin_Server партов по всему Workspace
+-- Глубокий поиск Coin_Server
 local function getAllCoins()
     local coins = {}
-    
-    -- Рекурсивная функция обхода любых папок и моделей
     local function scan(parent)
         for _, child in ipairs(parent:GetChildren()) do
             if child.Name == "Coin_Server" and child:IsA("BasePart") then
                 table.insert(coins, child)
             end
-            -- Если у объекта есть дети, проверяем их тоже (внутри моделей/папок)
             if #child:GetChildren() > 0 then
                 scan(child)
             end
         end
     end
-    
     scan(Workspace)
     return coins
 end
 
--- ==================== ГЛАВНЫЙ ПОТОК ФАРМА ====================
+-- ==================== ГЛАВНЫЙ ПОТОК ПОДЗЕМНОГО ФАРМА ====================
 task.spawn(function()
-    print("[AUTO-FARM] Поток глубокого поиска запущен!")
+    print("[AUTO-FARM] Стелс-поток под землей запущен!")
     while true do
-        task.wait(0.3)
+        task.wait(0.2)
         
         if not autoFarmActive then
             continue
@@ -94,15 +88,12 @@ task.spawn(function()
             continue
         end
 
-        -- Получаем все Coin_Server парты по всему воркспейсу
         local coins = getAllCoins()
-
         if #coins == 0 then
             task.wait(0.5)
             continue
         end
 
-        -- Сбрасываем лимит если начался новый раунд
         if #coins > 5 and collectedCoinsCount >= maxCoinsPerRound then
             collectedCoinsCount = 0
         end
@@ -113,7 +104,7 @@ task.spawn(function()
             continue
         end
 
-        -- Ищем самый близкий Coin_Server парт
+        -- Ищем ближайшую монету
         local nearestCoin = nil
         local shortestDist = math.huge
 
@@ -127,32 +118,42 @@ task.spawn(function()
             end
         end
 
-        -- Летим к найденному парту
+        -- Полет под картой к монете
         if nearestCoin and nearestCoin.Parent then
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
                 local _, _, currentRoot = getCharacter()
                 if not currentRoot then break end
                 
-                local targetPos = nearestCoin.Position
+                -- Целевая позиция монеты, но СМЕЩЕННАЯ ВНИЗ (под карту / под пол)
+                -- Монета находится в точке coin.Position. 
+                -- Мы ставим персонажа на 3.5 блока ниже монеты, чтобы пол защищал тебя от убийцы, 
+                -- а верхняя часть хитбокса/головы доставала до монеты.
+                local targetPos = nearestCoin.Position - Vector3.new(0, 3.5, 0)
                 local currentPos = currentRoot.Position
                 local dist = (currentPos - targetPos).Magnitude
                 
-                if dist < 3 then
-                    currentRoot.CFrame = nearestCoin.CFrame
+                if dist < 2 then
+                    currentRoot.CFrame = CFrame.new(targetPos)
                     break
                 end
                 
                 local dir = (targetPos - currentPos).Unit
-                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 45 * 0.05), targetPos)
+                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 40 * 0.05), targetPos)
                 currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 
                 task.wait(0.05)
             end
             
             collectedCoinsCount = collectedCoinsCount + 1
-            task.wait(0.2)
+            
+            -- Твоя задержка 1.5 секунды на монете (находясь под картой)
+            local waitTimer = 0
+            while waitTimer < 1.5 and autoFarmActive do
+                task.wait(0.1)
+                waitTimer = waitTimer + 0.1
+            end
         end
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V2.7 загружен", Content = "Поиск Coin_Server партов активирован!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V2.9 загружен", Content = "Стелс-фарм под картой активирован!", Duration = 4})
