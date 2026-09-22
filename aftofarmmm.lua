@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V2.9 (UNDERMAP STEALTH FARM + 1.5S DELAY)
+-- MM2 ULTIMATE AUTO-FARM V3.0 (NOCLIP UNDERMAP + 1.5S DELAY)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -25,17 +25,17 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Undermap Farm (Stealth V2.9)",
-   LoadingTitle = "Загрузка стелс-режима...",
+   Name = "💰 MM2 Noclip Farm (V3.0)",
+   LoadingTitle = "Загрузка Noclip...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
-local FarmTab = Window:CreateTab("🚀 Стелс-Фарм", 4483362458)
+local FarmTab = Window:CreateTab("🚀 Сквозь стены", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Подземный Авто-Фарм",
+   Name = "💰 Включить Noclip Авто-Фарм",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -45,7 +45,7 @@ FarmTab:CreateToggle({
 })
 
 FarmTab:CreateButton({
-   Name = "📌 Сохранить Safe-Точку (на всякий случай)",
+   Name = "📌 Сохранить Safe-Точку",
    Callback = function()
       local _, _, root = getCharacter()
       if root then
@@ -72,9 +72,23 @@ local function getAllCoins()
     return coins
 end
 
--- ==================== ГЛАВНЫЙ ПОТОК ПОДЗЕМНОГО ФАРМА ====================
+-- ==================== ПОТОК ОТКЛЮЧЕНИЯ КОЛЛИЗИЙ (NOCLIP) ====================
+-- Делает так, чтобы персонаж и стены больше не мешали друг другу
+RunService.Stepped:Connect(function()
+    if not autoFarmActive then return end
+    local char, _, _ = getCharacter()
+    if char then
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+-- ==================== ГЛАВНЫЙ ПОТОК ФАРМА ====================
 task.spawn(function()
-    print("[AUTO-FARM] Стелс-поток под землей запущен!")
+    print("[AUTO-FARM] Поток Noclip-фарма запущен!")
     while true do
         task.wait(0.2)
         
@@ -118,16 +132,13 @@ task.spawn(function()
             end
         end
 
-        -- Полет под картой к монете
+        -- Летим сквозь любые стены и преграды под карту к монете
         if nearestCoin and nearestCoin.Parent then
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
                 local _, _, currentRoot = getCharacter()
                 if not currentRoot then break end
                 
-                -- Целевая позиция монеты, но СМЕЩЕННАЯ ВНИЗ (под карту / под пол)
-                -- Монета находится в точке coin.Position. 
-                -- Мы ставим персонажа на 3.5 блока ниже монеты, чтобы пол защищал тебя от убийцы, 
-                -- а верхняя часть хитбокса/головы доставала до монеты.
+                -- Подземная позиция (на 3.5 блока ниже монеты), чтобы убийца не достал
                 local targetPos = nearestCoin.Position - Vector3.new(0, 3.5, 0)
                 local currentPos = currentRoot.Position
                 local dist = (currentPos - targetPos).Magnitude
@@ -138,7 +149,7 @@ task.spawn(function()
                 end
                 
                 local dir = (targetPos - currentPos).Unit
-                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 40 * 0.05), targetPos)
+                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 50 * 0.05), targetPos)
                 currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 
                 task.wait(0.05)
@@ -146,7 +157,7 @@ task.spawn(function()
             
             collectedCoinsCount = collectedCoinsCount + 1
             
-            -- Твоя задержка 1.5 секунды на монете (находясь под картой)
+            -- Задержка 1.5 секунды перед полетом к следующей монете
             local waitTimer = 0
             while waitTimer < 1.5 and autoFarmActive do
                 task.wait(0.1)
@@ -156,4 +167,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V2.9 загружен", Content = "Стелс-фарм под картой активирован!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V3.0 загружен", Content = "Noclip сквозь стены + Подземный фарм активны!", Duration = 4})
