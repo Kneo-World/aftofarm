@@ -1,11 +1,12 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V3.1 (FIXED VOID & SPACE GLITCH)
+-- MM2 ULTIMATE AUTO-FARM V3.3 (DEBUG CONSOLE LOGS)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 local autoFarmActive = false
@@ -23,21 +24,21 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Auto-Farm (Fixed V3.1)",
-   LoadingTitle = "Загрузка анти-космоса...",
+   Name = "💰 MM2 Auto-Farm (Debug V3.3)",
+   LoadingTitle = "Загрузка дебага...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
-local FarmTab = Window:CreateTab("🚀 Фарм без падений", 4483362458)
+local FarmTab = Window:CreateTab("🚀 Отладка", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Авто-Фарм",
+   Name = "💰 Включить Авто-Фарм (Debug)",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
-      print("[AUTO-FARM] Статус:", Value)
+      print("[DEBUG] Статус автофарма изменен на:", Value)
       if Value then collectedCoinsCount = 0 end
    end,
 })
@@ -53,11 +54,14 @@ FarmTab:CreateButton({
    end,
 })
 
--- Глубокий поиск Coin_Server
+-- Рекурсивный поиск с отладкой
 local function getAllCoins()
     local coins = {}
+    local totalChecked = 0
+    
     local function scan(parent)
         for _, child in ipairs(parent:GetChildren()) do
+            totalChecked = totalChecked + 1
             if child.Name == "Coin_Server" and child:IsA("BasePart") then
                 table.insert(coins, child)
             end
@@ -66,12 +70,13 @@ local function getAllCoins()
             end
         end
     end
+    
     scan(Workspace)
     return coins
 end
 
--- Отключение коллизий со стенами, чтобы не застревать
-game:GetService("RunService").Stepped:Connect(function()
+-- Noclip
+RunService.Stepped:Connect(function()
     if not autoFarmActive then return end
     local char, _, _ = getCharacter()
     if char then
@@ -85,9 +90,9 @@ end)
 
 -- ==================== ГЛАВНЫЙ ПОТОК ФАРМА ====================
 task.spawn(function()
-    print("[AUTO-FARM] Поток без падений запущен!")
+    print("[DEBUG] Поток фарма запущен и готов к работе!")
     while true do
-        task.wait(0.2)
+        task.wait(0.5)
         
         if not autoFarmActive then
             continue
@@ -95,20 +100,24 @@ task.spawn(function()
 
         local char, hum, root = getCharacter()
         if not char or not root or not hum then
+            print("[DEBUG] Персонаж не найден (умер или грузится)...")
             task.wait(1)
             continue
         end
 
-        -- Экстренная защита: если упали ниже -50 по Y (в пустоту), возвращаем на сейф-точку
         if root.Position.Y < -50 then
+            print("[DEBUG] Упали в войд! Телепорт на сейф-точку.")
             root.CFrame = safePointCFrame
             task.wait(1)
             continue
         end
 
         local coins = getAllCoins()
+        print("[DEBUG] Найдено Coin_Server партов на карте:", #coins)
+
         if #coins == 0 then
-            task.wait(0.5)
+            print("[DEBUG] Монет нет! Ждем начала раунда...")
+            task.wait(1)
             continue
         end
 
@@ -117,6 +126,7 @@ task.spawn(function()
         end
 
         if collectedCoinsCount >= maxCoinsPerRound then
+            print("[DEBUG] Лимит монет на раунд исчерпан. Идем на сейф-точку.")
             root.CFrame = safePointCFrame
             task.wait(1)
             continue
@@ -136,10 +146,10 @@ task.spawn(function()
             end
         end
 
-        -- Плавный полет к монете без улетания в космос
         if nearestCoin and nearestCoin.Parent then
+            print("[DEBUG] Летим к монете на дистанции:", shortestDist)
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
-                local _, _, currentRoot = code_getCharacter_fix or getCharacter()
+                local _, _, currentRoot = getCharacter()
                 if not currentRoot then break end
                 
                 local targetPos = nearestCoin.Position
@@ -162,14 +172,17 @@ task.spawn(function()
             end
             
             collectedCoinsCount = collectedCoinsCount + 1
+            print("[DEBUG] Монета собрана! Всего собрано:", collectedCoinsCount)
             
-            -- Задержка 1.5 секунды на монете с удержанием позиции (чтобы не унесло физикой)
+            -- Пауза 1.5 секунды
             local waitTimer = 0
             while waitTimer < 1.5 and autoFarmActive do
                 local _, _, curRoot = getCharacter()
                 if curRoot then
                     curRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                     curRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                else
+                    break
                 end
                 task.wait(0.1)
                 waitTimer = waitTimer + 0.1
@@ -178,4 +191,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V3.1 загружен", Content = "Фикс космоса и падений активен!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V3.3 загружен", Content = "Дебаг-логи активированы в консоли!", Duration = 4})
