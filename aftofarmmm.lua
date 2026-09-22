@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V2.5 (DEBUG & DIRECT FIX)
+-- MM2 ULTIMATE AUTO-FARM V2.6 (COIN CONTAINER MODEL FIX)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -25,7 +25,7 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Auto-Farm (Debug V2.5)",
+   Name = "💰 MM2 Auto-Farm (Fixed V2.6)",
    LoadingTitle = "Загрузка...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -61,7 +61,7 @@ FarmTab:CreateButton({
 task.spawn(function()
     print("[AUTO-FARM] Поток фарма успешно запущен!")
     while true do
-        task.wait(0.5) -- Чуть реже проверяем, чтобы не нагружать
+        task.wait(0.3)
         
         if not autoFarmActive then
             continue
@@ -69,43 +69,39 @@ task.spawn(function()
 
         local char, hum, root = getCharacter()
         if not char or not root or not hum then
-            print("[AUTO-FARM] Персонаж не найден или мертв, ждем респавна...")
             task.wait(1)
             continue
         end
 
-        -- Ищем папку CoinContainer
+        -- Ищем CoinContainer как модель или объект в Workspace
         local coinContainer = Workspace:FindFirstChild("CoinContainer")
         if not coinContainer then
-            print("[AUTO-FARM] Папка CoinContainer не найдена в Workspace! (Раунд еще не начался?)")
+            -- Не спамим в консоль каждую секунду, просто ждем раунд
             task.wait(1)
             continue
         end
 
-        -- Собираем список всех монет
+        -- Собираем все монеты-парты из модели CoinContainer
         local coins = {}
         for _, obj in ipairs(coinContainer:GetChildren()) do
-            if obj.Name == "Coin_Server" and obj:IsA("BasePart") then
+            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
                 table.insert(coins, obj)
             end
         end
 
-        print("[AUTO-FARM] Найдено монет в контейнере:", #coins)
-
         if #coins == 0 then
-            task.wait(1)
+            task.wait(0.5)
             continue
         end
 
-        -- Сбрасываем лимит если монет снова много
+        -- Сбрасываем лимит если начался новый раунд
         if #coins > 5 and collectedCoinsCount >= maxCoinsPerRound then
             collectedCoinsCount = 0
         end
 
         if collectedCoinsCount >= maxCoinsPerRound then
-            print("[AUTO-FARM] Лимит монет за раунд собран, летим в сейф.")
             root.CFrame = safePointCFrame
-            task.wait(2)
+            task.wait(1)
             continue
         end
 
@@ -114,17 +110,17 @@ task.spawn(function()
         local shortestDist = math.huge
 
         for _, coin in ipairs(coins) do
-            local dist = (root.Position - coin.Position).Magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                nearestCoin = coin
+            if coin and coin.Parent then
+                local dist = (root.Position - coin.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    nearestCoin = coin
+                end
             end
         end
 
         -- Летим к монете
         if nearestCoin and nearestCoin.Parent then
-            print("[AUTO-FARM] Летим к монете на дистанции:", shortestDist)
-            
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
                 local _, _, currentRoot = getCharacter()
                 if not currentRoot then break end
@@ -138,12 +134,11 @@ task.spawn(function()
                     break
                 end
                 
-                -- Плавное движение к позиции монеты
                 local dir = (targetPos - currentPos).Unit
-                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 40 * 0.1), targetPos)
+                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 45 * 0.05), targetPos)
                 currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
                 
-                task.wait(0.1)
+                task.wait(0.05)
             end
             
             collectedCoinsCount = collectedCoinsCount + 1
@@ -152,4 +147,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V2.5 загружен", Content = "Отладка включена, чекни F9!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V2.6 загружен", Content = "Контейнер-модель теперь поддерживается!", Duration = 4})
