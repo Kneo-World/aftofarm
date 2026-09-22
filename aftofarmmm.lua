@@ -1,19 +1,17 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V3.0 (NOCLIP UNDERMAP + 1.5S DELAY)
+-- MM2 ULTIMATE AUTO-FARM V3.1 (FIXED VOID & SPACE GLITCH)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local autoFarmActive = false
 local collectedCoinsCount = 0
 local maxCoinsPerRound = 40
-local safePointCFrame = CFrame.new(0, 100, 0)
+local safePointCFrame = CFrame.new(0, 50, 0)
 
 local function getCharacter()
     local char = LocalPlayer.Character
@@ -25,17 +23,17 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Noclip Farm (V3.0)",
-   LoadingTitle = "Загрузка Noclip...",
+   Name = "💰 MM2 Auto-Farm (Fixed V3.1)",
+   LoadingTitle = "Загрузка анти-космоса...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
    KeySystem = false
 })
 
-local FarmTab = Window:CreateTab("🚀 Сквозь стены", 4483362458)
+local FarmTab = Window:CreateTab("🚀 Фарм без падений", 4483362458)
 
 FarmTab:CreateToggle({
-   Name = "💰 Включить Noclip Авто-Фарм",
+   Name = "💰 Включить Авто-Фарм",
    CurrentValue = false,
    Callback = function(Value)
       autoFarmActive = Value
@@ -72,9 +70,8 @@ local function getAllCoins()
     return coins
 end
 
--- ==================== ПОТОК ОТКЛЮЧЕНИЯ КОЛЛИЗИЙ (NOCLIP) ====================
--- Делает так, чтобы персонаж и стены больше не мешали друг другу
-RunService.Stepped:Connect(function()
+-- Отключение коллизий со стенами, чтобы не застревать
+game:GetService("RunService").Stepped:Connect(function()
     if not autoFarmActive then return end
     local char, _, _ = getCharacter()
     if char then
@@ -88,7 +85,7 @@ end)
 
 -- ==================== ГЛАВНЫЙ ПОТОК ФАРМА ====================
 task.spawn(function()
-    print("[AUTO-FARM] Поток Noclip-фарма запущен!")
+    print("[AUTO-FARM] Поток без падений запущен!")
     while true do
         task.wait(0.2)
         
@@ -98,6 +95,13 @@ task.spawn(function()
 
         local char, hum, root = getCharacter()
         if not char or not root or not hum then
+            task.wait(1)
+            continue
+        end
+
+        -- Экстренная защита: если упали ниже -50 по Y (в пустоту), возвращаем на сейф-точку
+        if root.Position.Y < -50 then
+            root.CFrame = safePointCFrame
             task.wait(1)
             continue
         end
@@ -132,34 +136,41 @@ task.spawn(function()
             end
         end
 
-        -- Летим сквозь любые стены и преграды под карту к монете
+        -- Плавный полет к монете без улетания в космос
         if nearestCoin and nearestCoin.Parent then
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
-                local _, _, currentRoot = getCharacter()
+                local _, _, currentRoot = code_getCharacter_fix or getCharacter()
                 if not currentRoot then break end
                 
-                -- Подземная позиция (на 3.5 блока ниже монеты), чтобы убийца не достал
-                local targetPos = nearestCoin.Position - Vector3.new(0, 3.5, 0)
+                local targetPos = nearestCoin.Position
                 local currentPos = currentRoot.Position
                 local dist = (currentPos - targetPos).Magnitude
                 
                 if dist < 2 then
                     currentRoot.CFrame = CFrame.new(targetPos)
+                    currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    currentRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                     break
                 end
                 
                 local dir = (targetPos - currentPos).Unit
-                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 50 * 0.05), targetPos)
+                currentRoot.CFrame = CFrame.new(currentPos + dir * math.min(dist, 45 * 0.05), targetPos)
                 currentRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                currentRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
                 
                 task.wait(0.05)
             end
             
             collectedCoinsCount = collectedCoinsCount + 1
             
-            -- Задержка 1.5 секунды перед полетом к следующей монете
+            -- Задержка 1.5 секунды на монете с удержанием позиции (чтобы не унесло физикой)
             local waitTimer = 0
             while waitTimer < 1.5 and autoFarmActive do
+                local _, _, curRoot = getCharacter()
+                if curRoot then
+                    curRoot.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+                    curRoot.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+                end
                 task.wait(0.1)
                 waitTimer = waitTimer + 0.1
             end
@@ -167,4 +178,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V3.0 загружен", Content = "Noclip сквозь стены + Подземный фарм активны!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V3.1 загружен", Content = "Фикс космоса и падений активен!", Duration = 4})
