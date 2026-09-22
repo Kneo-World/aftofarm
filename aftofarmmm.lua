@@ -1,5 +1,5 @@
 -- ============================================================
--- MM2 ULTIMATE AUTO-FARM V2.6 (COIN CONTAINER MODEL FIX)
+-- MM2 ULTIMATE AUTO-FARM V2.7 (DEEP RECURSIVE COIN_SERVER SEARCH)
 -- ============================================================
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
@@ -25,7 +25,7 @@ end
 
 -- ==================== ИНТЕРФЕЙС ====================
 local Window = Rayfield:CreateWindow({
-   Name = "💰 MM2 Auto-Farm (Fixed V2.6)",
+   Name = "💰 MM2 Auto-Farm (Deep Search V2.7)",
    LoadingTitle = "Загрузка...",
    LoadingSubtitle = "by Kneo World",
    ConfigurationSaving = { Enabled = false },
@@ -57,9 +57,30 @@ FarmTab:CreateButton({
    end,
 })
 
+-- Функция для глубокого поиска ВСЕХ Coin_Server партов по всему Workspace
+local function getAllCoins()
+    local coins = {}
+    
+    -- Рекурсивная функция обхода любых папок и моделей
+    local function scan(parent)
+        for _, child in ipairs(parent:GetChildren()) do
+            if child.Name == "Coin_Server" and child:IsA("BasePart") then
+                table.insert(coins, child)
+            end
+            -- Если у объекта есть дети, проверяем их тоже (внутри моделей/папок)
+            if #child:GetChildren() > 0 then
+                scan(child)
+            end
+        end
+    end
+    
+    scan(Workspace)
+    return coins
+end
+
 -- ==================== ГЛАВНЫЙ ПОТОК ФАРМА ====================
 task.spawn(function()
-    print("[AUTO-FARM] Поток фарма успешно запущен!")
+    print("[AUTO-FARM] Поток глубокого поиска запущен!")
     while true do
         task.wait(0.3)
         
@@ -73,21 +94,8 @@ task.spawn(function()
             continue
         end
 
-        -- Ищем CoinContainer как модель или объект в Workspace
-        local coinContainer = Workspace:FindFirstChild("CoinContainer")
-        if not coinContainer then
-            -- Не спамим в консоль каждую секунду, просто ждем раунд
-            task.wait(1)
-            continue
-        end
-
-        -- Собираем все монеты-парты из модели CoinContainer
-        local coins = {}
-        for _, obj in ipairs(coinContainer:GetChildren()) do
-            if obj.Name == "Coin_Server" and (obj:IsA("BasePart") or obj:IsA("Part") or obj:IsA("MeshPart")) then
-                table.insert(coins, obj)
-            end
-        end
+        -- Получаем все Coin_Server парты по всему воркспейсу
+        local coins = getAllCoins()
 
         if #coins == 0 then
             task.wait(0.5)
@@ -105,7 +113,7 @@ task.spawn(function()
             continue
         end
 
-        -- Ищем самую близкую монету
+        -- Ищем самый близкий Coin_Server парт
         local nearestCoin = nil
         local shortestDist = math.huge
 
@@ -119,7 +127,7 @@ task.spawn(function()
             end
         end
 
-        -- Летим к монете
+        -- Летим к найденному парту
         if nearestCoin and nearestCoin.Parent then
             while autoFarmActive and nearestCoin and nearestCoin.Parent do
                 local _, _, currentRoot = getCharacter()
@@ -147,4 +155,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "Скрипт V2.6 загружен", Content = "Контейнер-модель теперь поддерживается!", Duration = 4})
+Rayfield:Notify({Title = "Скрипт V2.7 загружен", Content = "Поиск Coin_Server партов активирован!", Duration = 4})
